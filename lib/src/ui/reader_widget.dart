@@ -212,8 +212,6 @@ class _ReaderWidgetState extends State<ReaderWidget>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!mounted) return;
-
     final CameraController? cameraController = controller;
     if (cameraController == null || !cameraController.value.isInitialized) {
       return;
@@ -222,21 +220,33 @@ class _ReaderWidgetState extends State<ReaderWidget>
     switch (state) {
       case AppLifecycleState.resumed:
         if (cameras.isNotEmpty && !_isCameraOn) {
-          debugPrint('Resuming camera...');
-          onNewCameraSelected(selectedCamera ?? cameras.first);
+          onNewCameraSelected(cameras.first);
         }
         break;
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.paused:
-      case AppLifecycleState.hidden:
-        debugPrint('Stopping camera stream...');
-        _stopImageStream();
-        break;
       case AppLifecycleState.detached:
-        debugPrint('Detaching camera...');
-        _cleanupCamera();
+        break;
+      default:
+        controller?.dispose();
+        setState(() => _isCameraOn = false);
         break;
     }
+  }
+
+
+
+
+  @override
+  void dispose() {
+    debugPrint('Disposing camera...');
+    zx.stopCameraProcessing();
+    controller?.removeListener(rebuildOnMount);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void rebuildOnMount() {
+    if (!mounted) return;
+    setState(() => _isCameraOn = true);
   }
 
   void _cleanupCamera() {
@@ -272,8 +282,6 @@ class _ReaderWidgetState extends State<ReaderWidget>
     if (cameraDescription == null) {
       return;
     }
-
-    _stopImageStream();
     
     final CameraController? oldController = controller;
     if (oldController != null) {
@@ -584,19 +592,5 @@ class _ReaderWidgetState extends State<ReaderWidget>
       case ImageFormatGroup.nv21:
         return zxing.ImageFormat.rgb;
     }
-  }
-
-  void rebuildOnMount() {
-    if (!mounted) return;
-    setState(() => _isCameraOn = true);
-  }
-
-  @override
-  void dispose() {
-    debugPrint('Disposing camera...');
-    zx.stopCameraProcessing();
-    controller?.removeListener(rebuildOnMount);
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
   }
 }
